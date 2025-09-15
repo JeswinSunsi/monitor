@@ -8,6 +8,10 @@ export default defineConfig({
   plugins: [
     vue(),
   ],
+    server: {
+    allowedHosts: ["5d1ca5ca6871.ngrok-free.app"],
+    host: true, 
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
