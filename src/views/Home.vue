@@ -219,6 +219,10 @@
   font-weight: 700;
 }
 
+.nav-item--active {
+  color: #4f46e5;
+}
+
 body {
   margin: 0;
   padding: 0;
@@ -493,8 +497,7 @@ body {
           <a v-for="navItem in navigationItems" :key="navItem.name"
             :class="['nav-item', navItem.active ? 'nav-item--active' : '']" href="#"
             @click.prevent="navigateTo(navItem.name)">
-            <span :class="['material-symbols-outlined', !navItem.active && 'nav-icon--outlined']">{{
-              navItem.icon }}</span>
+            <span :class="['material-symbols-outlined', !navItem.active && 'nav-icon--outlined']">{{navItem.icon }}</span>
             <p class="nav-label">{{ navItem.name }}</p>
           </a>
         </nav>
