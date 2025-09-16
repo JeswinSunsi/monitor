@@ -98,7 +98,7 @@ async function confirmPhoto() {
             face: base64Image,
         };
 
-        const res = await fetch("https://32d3b93219fe.ngrok-free.app/user/register", {
+        const res = await fetch("https://5af483c564df.ngrok-free.app/user/register", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
