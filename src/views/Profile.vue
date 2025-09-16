@@ -12,10 +12,10 @@
       <!-- User Info -->
       <div class="user-info">
         <h2 class="user-name">{{ user.fullName }}</h2>
-        <p class="reg-no">Student ID: {{ user.reg_no }}</p>
-        <div class="attendance">
-          <span>Overall Attendance:</span>
-          <strong :style="{ color: attendanceColor }">{{ user.attendance }}%</strong>
+        <p class="reg-no">{{ user.role == 'student' ? 'Student' : 'Professor'}} ID: {{ user.registerNumber }}</p>
+        <div class="attendance" v-if="user.role == 'student'">
+          <span>Overall Attendance: </span>
+          <strong :style="{ color: attendanceColor }">87.6%</strong>
         </div>
       </div>
 
@@ -25,12 +25,7 @@
 
         <div class="input-field">
           <span class="material-symbols-outlined input-icon">mail</span>
-          <input type="text" v-model="user.email" readonly />
-        </div>
-
-        <div class="input-field">
-          <span class="material-symbols-outlined input-icon">group</span>
-          <input type="text" v-model="user.parent_email" readonly />
+          <input type="text" v-model="user.parentEmail" readonly />
         </div>
       </div>
 
@@ -71,9 +66,9 @@ const notifications = ref(true);
 
 const user = ref({
   fullName: "",
-  reg_no: "",
+  registerNumber: "",
   email: "",
-  parent_email: "",
+  parentEmail: "",
   password: "",
   attendance: 0,
 });
@@ -83,6 +78,7 @@ onMounted(() => {
   const storedData = localStorage.getItem("signupData");
   if (storedData) {
     user.value = JSON.parse(storedData);
+    console.log(user.value)
   }
 });
 
