@@ -1,65 +1,133 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from "vue";
+import { ref, onMounted, onBeforeUnmount, nextTick } from "vue";
 
 const videoRef = ref(null);
 const photo = ref(null);
 let stream = null;
 
-onMounted(async () => {
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: "user", // front-facing camera
-      },
-    });
-    if (videoRef.value) {
-      videoRef.value.srcObject = stream;
+const stopCamera = () => {
+    if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+        stream = null;
     }
-  } catch (err) {
-    console.error("Error accessing camera:", err);
-  }
-});
+};
 
-onBeforeUnmount(() => {
-  if (stream) {
-    stream.getTracks().forEach((track) => track.stop());
-  }
-});
+const startCamera = async () => {
+    stopCamera();
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "user" },
+            audio: false,
+        });
+        if (videoRef.value) {
+            videoRef.value.srcObject = stream;
+        }
+    } catch (err) {
+        console.error("Error accessing camera:", err);
+    }
+};
 
 function capture() {
-  const video = videoRef.value;
-  if (!video) return;
+    const video = videoRef.value;
+    if (!video) return;
 
-  const size = 300;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
+    const size = 300;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
 
-  const videoAspect = video.videoWidth / video.videoHeight;
-  let sx, sy, sw, sh;
+    const videoAspect = video.videoWidth / video.videoHeight;
+    let sx, sy, sWidth, sHeight;
 
-  if (videoAspect > 1) {
-    // wider than tall
-    sh = video.videoHeight;
-    sw = sh;
-    sx = (video.videoWidth - sw) / 2;
-    sy = 0;
-  } else {
-    // taller than wide
-    sw = video.videoWidth;
-    sh = sw;
-    sx = 0;
-    sy = (video.videoHeight - sh) / 2;
-  }
+    if (videoAspect > 1) {
+        sHeight = video.videoHeight;
+        sWidth = sHeight;
+        sx = (video.videoWidth - sWidth) / 2;
+        sy = 0;
+    } else {
+        sWidth = video.videoWidth;
+        sHeight = sWidth;
+        sx = 0;
+        sy = (video.videoHeight - sHeight) / 2;
+    }
 
-  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, size, size);
-  photo.value = canvas.toDataURL("image/png");
+    // Mirror effect
+    ctx.translate(size, 0);
+    ctx.scale(-1, 1);
+
+    ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, size, size);
+
+    photo.value = canvas.toDataURL("image/png");
+
+    stopCamera();
 }
 
-function retake() {
-  photo.value = null;
+async function retake() {
+    photo.value = null;
+    await nextTick();
+    startCamera();
 }
+
+import { useRouter } from "vue-router";
+
+const router = useRouter();
+
+async function confirmPhoto() {
+    if (!photo.value) return;
+
+    try {
+        const storedData = localStorage.getItem("signupData");
+        if (!storedData) {
+            console.error("No signup data found in localStorage");
+            return;
+        }
+
+        const formData = JSON.parse(storedData);
+
+        // Strip the data:image/...;base64, part
+        const base64Image = photo.value.replace(/^data:image\/\w+;base64,/, "");
+
+        const payload = {
+            reg_no: formData.registerNumber,
+            name: formData.fullName,
+            password: formData.password,
+            parent_email: formData.parentEmail,
+            role: "student",
+            pfp: null,
+            face: base64Image,
+        };
+
+        const res = await fetch("https://32d3b93219fe.ngrok-free.app/user/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+            throw new Error(`HTTP error ${res.status}`);
+        }
+
+        const data = await res.json();
+        console.log("Response from API:", data);
+
+        if (Array.isArray(data) && data[0] === true && data[1] === "User registered successfully.") {
+            router.push("/");
+        } else {
+            alert("Something went wrong");
+            router.push("/signup");
+        }
+    } catch (err) {
+        console.error("Error confirming photo:", err);
+        alert("Something went wrong");
+        router.push("/signup");
+    }
+}
+
+
+
+onMounted(startCamera);
+onBeforeUnmount(stopCamera);
 </script>
 
 <template>
@@ -73,7 +141,7 @@ function retake() {
       </p>
     </div>
 
-    <div class="camera-box">
+    <div class="camera-box" :class="{ pulsing: photo }">
       <video v-if="!photo" ref="videoRef" autoplay playsinline muted></video>
       <img v-else :src="photo" alt="Your selfie" />
     </div>
@@ -88,13 +156,12 @@ function retake() {
       <button class="btn retake-btn" @click="retake">
         Retake
       </button>
-      <button class="btn confirm-btn" @click="$router.push('/')">
+      <button class="btn confirm-btn" @click="confirmPhoto">
         Use this photo
       </button>
     </div>
   </div>
 </template>
-
 
 <style scoped>
 .camera-wrapper {
@@ -150,8 +217,29 @@ function retake() {
 }
 
 .camera-box video {
-    transform: scaleX(-1);
+  transform: scaleX(-1);
 }
+
+/* 🔥 Pulse effect only when photo is captured */
+.camera-box.pulsing {
+  animation: pulse-border 3s infinite; /* slower pulse */
+}
+
+@keyframes pulse-border {
+  0% {
+    border-color: #e0e7ff;
+    box-shadow: 0 0 0 0 rgba(224, 231, 255, 0.7);
+  }
+  50% {
+    border-color: #e0e7ff;
+    box-shadow: 0 0 0 18px rgba(224, 231, 255, 0);
+  }
+  100% {
+    border-color: #e0e7ff;
+    box-shadow: 0 0 0 0 rgba(224, 231, 255, 0.7);
+  }
+}
+
 
 .controls {
   display: flex;
