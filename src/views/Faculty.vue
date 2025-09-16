@@ -2,7 +2,6 @@
   <div class="app-container">
     <div class="main-wrapper">
       <div class="content-wrapper">
-        <!-- Header -->
         <header class="header">
           <div class="header-background">
             <img alt="University campus" class="header-bg-image"
@@ -21,10 +20,8 @@
           </div>
         </header>
 
-        <!-- Main -->
         <main class="main-content">
 
-          <!-- Start New Session -->
           <div class="qr-card">
             <div class="qr-card-content">
               <div class="qr-icon-container">
@@ -41,7 +38,6 @@
             </div>
           </div>
 
-          <!-- Active Session -->
           <div v-if="activeSession" class="active-session">
             <h2>Ongoing Session: {{ activeSession.subject }}</h2>
             <p>{{ activeSession.time }}</p>
@@ -61,22 +57,33 @@
 
           <div class="line-break" style="margin: 0 auto; width: 70%; background-color: lightgray; height: 1px;"></div>
 
-          <!-- Attendance History -->
           <div class="schedule-container">
             <header class="schedule-header">
               <h2 class="schedule-title">Attendance History</h2>
             </header>
-
             <div class="schedule-body">
-              <div v-if="history.length > 0">
-                <div v-for="(session, index) in history" :key="index" class="schedule-item">
+              <div v-if="historyWithStats.length > 0">
+                <div v-for="session in historyWithStats" :key="session.id" class="schedule-item">
                   <div class="schedule-time-col">{{ session.date }}</div>
                   <div class="schedule-card schedule-card--history">
-                    <p class="schedule-subject">{{ session.subject }}</p>
-                    <p class="schedule-time-range">{{ session.time }}</p>
-                    <p class="schedule-time-range">Present: {{ session.present }}/{{ session.total }}</p>
+                    <div class="session-info">
+                       <p class="schedule-subject">{{ session.subject }}</p>
+                       <p class="schedule-time-range">{{ session.time }}</p>
+                    </div>
+                    <div class="attendance-stats">
+                        <div class="stat-item">
+                            <span class="stat-value">{{ session.present }}/{{ session.total }}</span>
+                            <span class="stat-label">Present</span>
+                        </div>
+                        <div class="progress-wrapper">
+                             <div class="progress-container">
+                                <div class="progress-bar" :class="session.status" :style="{ width: session.percentage + '%' }"></div>
+                             </div>
+                             <span class="percentage-label">{{ session.percentage }}%</span>
+                        </div>
+                    </div>
                     <button class="export-btn" @click="exportReport(session)">
-                      <span class="material-symbols-outlined">download</span> Export
+                      <span class="material-symbols-outlined">summarize</span> View Report
                     </button>
                   </div>
                 </div>
@@ -86,6 +93,29 @@
               </div>
             </div>
           </div>
+
+          <div class="notifications-container">
+            <header class="schedule-header">
+              <h2 class="schedule-title">Notifications</h2>
+            </header>
+            <div class="notifications-body">
+              <div v-if="notifications.length > 0">
+                <div v-for="notification in notifications" :key="notification.id" class="notification-card">
+                  <div class="notification-icon" :class="`icon-${notification.type}`">
+                    <span class="material-symbols-outlined">{{ notification.icon }}</span>
+                  </div>
+                  <div class="notification-content">
+                    <p class="notification-title">{{ notification.title }}</p>
+                    <p class="notification-time">{{ notification.time }}</p>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="no-classes">
+                <p>No new notifications.</p>
+              </div>
+            </div>
+          </div>
+
         </main>
       </div>
       <NavComp />
@@ -94,7 +124,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import NavComp from '../components/nav.vue'
 
 const userName = ref('Jezwin')
@@ -103,37 +133,119 @@ const hasNotifications = ref(true)
 // Active session state
 const activeSession = ref(null)
 const liveStudents = ref([])
+let pollInterval = null // 🔹 to store polling interval id
 
 // Attendance history
 const history = ref([
-  { date: 'Sep 10', subject: 'Physics', time: '10:00 - 11:30 AM', present: 25, total: 30 },
-  { date: 'Sep 12', subject: 'Chemistry', time: '1:00 - 2:00 PM', present: 28, total: 30 },
+  { id: 1, date: 'Sep 10', subject: 'Physics', time: '10:00 - 11:30 AM', present: 25, total: 30 },
+  { id: 2, date: 'Sep 12', subject: 'Chemistry', time: '1:00 - 2:00 PM', present: 28, total: 30 },
+  { id: 3, date: 'Sep 13', subject: 'Advanced Physics', time: '9:00 - 10:30 AM', present: 15, total: 30 },
 ])
+
+// Notifications
+const notifications = ref([
+    { id: 1, type: 'success', icon: 'download_done', title: "Physics report for Sep 10 is ready.", time: "2 days ago" },
+    { id: 2, type: 'warning', icon: 'warning', title: "3 students have low attendance in Chemistry.", time: "1 day ago" },
+    { id: 3, type: 'info', icon: 'campaign', title: "System maintenance scheduled for tonight.", time: "3 hours ago" }
+])
+
+// Attendance stats
+const historyWithStats = computed(() => {
+  return history.value.map(session => {
+    const percentage = Math.round((session.present / session.total) * 100);
+    let status = 'progress-high';
+    if (percentage < 75) status = 'progress-medium';
+    if (percentage < 50) status = 'progress-low';
+    return { ...session, percentage, status };
+  });
+})
 
 const getUserDetails = () => {
   const storedData = localStorage.getItem("signupData")
   if (!storedData) return
   const formData = JSON.parse(storedData)
   userName.value = formData.fullName.split(" ")[0]
+  return formData.registerNumber
 }
 
-onMounted(() => {
-  getUserDetails()
-})
+// 🔹 Fetch live attendance from backend
+const fetchLiveAttendance = async () => {
+  try {
+    const res = await fetch("https://5af483c564df.ngrok-free.app/attendance/session/summary",       {
+        method: "GET",
+        headers: {
+          "ngrok-skip-browser-warning": "true"
+        }
+      })
+    if (!res.ok) throw new Error("Failed to fetch attendance summary")
+    const data = await res.json()
 
-// Start new session
-const startNewSession = () => {
-  activeSession.value = {
-    subject: 'Advanced Physics',
-    time: 'Now - 1:00 PM'
+    // Update UI with actual present students
+    liveStudents.value = data.present_roll_numbers.map((roll, idx) => ({
+      id: idx,
+      name: roll
+    }))
+  } catch (err) {
+    console.error("Error fetching attendance summary:", err)
   }
-  liveStudents.value = []
-  console.log("New session started")
 }
 
-// End session
-const endSession = () => {
+// 🔹 Start new session with backend call
+const startNewSession = async () => {
+  try {
+    const faculty_id = getUserDetails()
+    if (!faculty_id) {
+      console.error("No faculty_id found in localStorage")
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const lat = pos.coords.latitude
+      const lon = pos.coords.longitude
+
+      const payload = {
+        faculty_id,
+        lat,
+        lon,
+        radius_meters: 50,
+        remarks: ""
+      }
+
+      const res = await fetch("https://5af483c564df.ngrok-free.app/attendance/session/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+
+      if (!res.ok) throw new Error("Failed to create session")
+
+      const data = await res.json()
+      console.log("Session created:", data)
+
+      activeSession.value = {
+        subject: 'Advanced Physics',
+        time: 'Now - 1:00 PM'
+      }
+      liveStudents.value = []
+
+      // 🔹 Start polling backend every 5 seconds
+      pollInterval = setInterval(fetchLiveAttendance, 5000)
+    })
+  } catch (err) {
+    console.error("Error starting session:", err)
+  }
+}
+
+
+// 🔹 End session
+const endSession = async () => {
+  if (pollInterval) {
+    clearInterval(pollInterval)
+    pollInterval = null
+  }
+
   history.value.unshift({
+    id: Date.now(),
     date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
     subject: activeSession.value.subject,
     time: activeSession.value.time,
@@ -142,19 +254,188 @@ const endSession = () => {
   })
   activeSession.value = null
   console.log("Session ended")
+  let registerno = ref('')
+    const storedData = localStorage.getItem("signupData")
+        const formData = JSON.parse(storedData)
+        registerno.value = formData.registerNumber
+
+        const res = await fetch(`https://5af483c564df.ngrok-free.app/attendance/session/end/${registerno.value}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+
+      if (!res.ok) throw new Error("Failed to create session")
+
 }
 
-// Export report
 const exportReport = (session) => {
-  console.log("Exporting session:", session)
+  console.log("Viewing report for session:", session)
 }
 
 const handleNotifications = () => {
   console.log("Notifications clicked")
 }
+
+onMounted(() => {
+  getUserDetails()
+})
+
+onBeforeUnmount(() => {
+  if (pollInterval) clearInterval(pollInterval)
+})
 </script>
 
+
+
 <style scoped>
+/* --- NEW & REVAMPED STYLES --- */
+
+/* History Card Revamp */
+.schedule-card--history {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.attendance-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.stat-value {
+    font-weight: 700;
+    font-size: 1rem;
+    color: #111827;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.progress-wrapper {
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.progress-container {
+  width: 100%;
+  background-color: #e5e7eb;
+  border-radius: 99px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.5s ease-in-out;
+}
+
+.percentage-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+/* Color codes for progress bar */
+.progress-high { background-color: #22c55e; } /* Green */
+.progress-medium { background-color: #f59e0b; } /* Amber */
+.progress-low { background-color: #ef4444; } /* Red */
+
+.export-btn {
+  background: #4f46e5;
+  color: white;
+  border: none;
+  padding: 0.5rem 0.8rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  align-self: flex-start; /* Align button to the left */
+}
+
+.export-btn:hover {
+  background: #4338ca;
+}
+
+.notifications-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+.notifications-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notification-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background-color: #f9fafb;
+  padding: 1rem;
+  border: 1px solid #f3f4f6;
+}
+
+.notification-card:first-child {
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+}
+
+.notification-card:last-child {
+  border-bottom-left-radius: 0.5rem;
+  border-bottom-right-radius: 0.5rem;
+}
+
+.notification-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.notification-icon .material-symbols-outlined {
+  font-size: 22px;
+}
+.notification-content {
+  flex-grow: 1;
+}
+.notification-title {
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 4px 0;
+  font-size: 14px;
+}
+.notification-time {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* Icon colors for different notification types */
+.icon-success { background-color: #dcfce7; color: #16a34a; }
+.icon-warning { background-color: #fef3c7; color: #d97706; }
+.icon-info { background-color: #dbeafe; color: #2563eb; }
+
+/* --- EXISTING STYLES (slightly adjusted for consistency) --- */
 .active-session {
   background-color: #eef2ff;
   border: 1px solid #c7d2fe;
@@ -175,15 +456,6 @@ const handleNotifications = () => {
   border-radius: 8px;
   cursor: pointer;
   font-weight: bold;
-}
-.export-btn {
-  background: #4f46e5;
-  color: white;
-  border: none;
-  padding: 0.3rem 0.6rem;
-  border-radius: 6px;
-  cursor: pointer;
-  margin-top: 8px;
 }
 
 .active-session {
@@ -244,24 +516,6 @@ const handleNotifications = () => {
 
 .end-btn:hover {
   background: #dc2626;
-}
-
-.export-btn {
-  background: #4f46e5;
-  color: white;
-  border: none;
-  padding: 0.3rem 0.6rem;
-  border-radius: 6px;
-  cursor: pointer;
-  margin-top: 8px;
-  font-size: 13px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.export-btn:hover {
-  background: #4338ca;
 }
 
 .material-symbols-outlined {
@@ -473,52 +727,6 @@ body {
   margin: 0;
 }
 
-.schedule-nav {
-  display: flex;
-  gap: 16px;
-  color: #6b7280;
-}
-
-.date-selector {
-  display: flex;
-  justify-content: space-between;
-  text-align: center;
-}
-
-.date-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 8px;
-  border-radius: 10px;
-  cursor: pointer;
-  width: 17%;
-}
-
-.date-day {
-  margin-bottom: 10px;
-  font-size: 14px;
-  color: #6b7280;
-  font-weight: 500;
-}
-
-.date-number {
-  font-size: 16px;
-  font-weight: 700;
-  color: #111827;
-}
-
-.date-item--active {
-  background-color: #4f46e5;
-  color: white;
-}
-
-.date-item--active .date-day,
-.date-item--active .date-number {
-  color: white;
-}
-
 .schedule-body {
   display: flex;
   flex-direction: column;
@@ -554,55 +762,13 @@ body {
   font-size: 16px;
   font-weight: 700;
   color: #111827;
-  margin: 0 0 10px 0;
+  margin: 0 0 4px 0;
 }
 
 .schedule-time-range {
   font-size: 13px;
   color: #6b7280;
   margin: 0;
-}
-
-.date-selector {
-  position: relative;
-  display: flex;
-  justify-content: space-between;
-  margin: 1rem 0;
-}
-
-.active-date-indicator {
-  position: absolute;
-  top: 0;
-  height: 100%;
-  background-color: #4f46e5;
-  color: #FFF;
-  border-radius: 10px;
-  transition: left 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
-  z-index: 1;
-}
-
-.date-item {
-  cursor: pointer;
-  z-index: 2;
-  transition: color 0.3s ease-in-out;
-  flex: 1;
-  text-align: center;
-  padding: 8px 4px;
-  transition: color 0.2s ease-out;
-
-}
-
-.date-item--active-text {
-  color: white !important;
-  font-weight: bold;
-
-}
-
-.date-item--active-text .date-day,
-.date-item--active-text .date-number {
-  color: white !important;
-  transition: color 0.1s ease-in 0.15s;
-
 }
 
 .no-classes {
@@ -612,26 +778,6 @@ body {
   background-color: #f9f9f9;
   border-radius: 12px;
   margin: 1rem 0;
-}
-
-.schedule-card--physics {
-  border-color: #3b82f6;
-  background-color: #eff6ff;
-}
-
-.schedule-card--music {
-  border-color: #f97316;
-  background-color: #fff7ed;
-}
-
-.schedule-card--lunch {
-  border-color: #6b7280;
-  background-color: #f3f4f6;
-}
-
-.schedule-card--art {
-  border-color: #8b5cf6;
-  background-color: #f5f3ff;
 }
 
 .schedule-card--history {
