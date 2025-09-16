@@ -1,38 +1,59 @@
 <template>
-          <footer class="footer">
-        <nav class="navigation">
-          <a v-for="navItem in navigationItems" :key="navItem.name"
-            :class="['nav-item', navItem.active ? 'nav-item--active' : '']" href="#"
-            @click.prevent="navigateTo(navItem.name)">
-            <span :class="['material-symbols-outlined', !navItem.active && 'nav-icon--outlined']">{{ navItem.icon
-              }}</span>
-            <p class="nav-label">{{ navItem.name }}</p>
-          </a>
-        </nav>
-      </footer>
+  <footer class="footer">
+    <nav class="navigation">
+      <button
+        v-for="navItem in navigationItems"
+        :key="navItem.name"
+        type="button"
+        :class="['nav-item', navItem.active ? 'nav-item--active' : '']"
+        @click="navigateTo(navItem)"
+      >
+        <span
+          :class="['material-symbols-outlined', !navItem.active && 'nav-icon--outlined']"
+        >
+          {{ navItem.icon }}
+        </span>
+        <p class="nav-label">{{ navItem.name }}</p>
+      </button>
+    </nav>
+  </footer>
 </template>
 
 <script setup>
-import { useRouter } from 'vue-router';
-import { ref } from 'vue';
+import { useRouter, useRoute } from 'vue-router'
+import { ref, watch } from 'vue'
 
-const router = useRouter();
+const router = useRouter()
+const route = useRoute()
 
+// Define navigation items
 const navigationItems = ref([
-  { name: 'Home', icon: 'home', active: true, route: '/' },
-  { name: 'OD/ML', icon: 'calendar_month', active: false, route: '/odml' },
-  { name: 'Stats', icon: 'bar_chart', active: false, route: '/stats' },
-  { name: 'Profile', icon: 'person', active: false, route: '/profile' }
+  { name: 'Home', icon: 'home', route: '/' },
+  { name: 'OD/ML', icon: 'calendar_month', route: '/odml' },
+  { name: 'Stats', icon: 'bar_chart', route: '/stats' },
+  { name: 'Profile', icon: 'person', route: '/profile' }
 ])
 
-const navigateTo = (section) => {
+// Keep active state in sync with current route
+const updateActive = () => {
   navigationItems.value.forEach(item => {
-    item.active = item.name === section
-    if (item.active) {
-      router.push(item.route)
-      console.log(`Mapped ${section} to ${item.route}`)
-    }
+    item.active = route.path === item.route
   })
+}
+
+// Initial sync
+updateActive()
+
+// Watch for route changes (back/forward buttons, programmatic navigation, etc.)
+watch(() => route.path, () => {
+  updateActive()
+})
+
+const navigateTo = (navItem) => {
+  if (route.path !== navItem.route) {
+    router.push(navItem.route)
+  }
+  updateActive()
 }
 </script>
 
@@ -46,6 +67,7 @@ const navigateTo = (section) => {
 }
 
 .footer {
+  font-family: Manrope, "Noto Sans", sans-serif;
   position: fixed;
   bottom: 0;
   width: 100%;
@@ -70,6 +92,10 @@ const navigateTo = (section) => {
   width: 25%;
   text-decoration: none;
   color: #6b7280;
+  cursor: pointer;
+  padding: 8px 0;
+  background: none;
+  border: none;
 }
 
 .nav-label {
@@ -81,7 +107,6 @@ const navigateTo = (section) => {
 .nav-item--active .nav-label {
   font-weight: 700;
 }
-
 
 .nav-item--active {
   color: #4f46e5;
