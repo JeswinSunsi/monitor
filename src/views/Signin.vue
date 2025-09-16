@@ -4,37 +4,39 @@
       <img src="../assets/LOGO.png" alt="Logo" class="logo-astra" />
 
       <div class="header">
-        <h2 class="title">Create your account</h2>
-        <p class="subtitle">Get started with tracking your attendance.</p>
+        <h2 class="title">Login to your account</h2>
+        <p class="subtitle">Mark your attendance hassle-free</p>
       </div>
 
       <div class="form-fields">
         <div class="input-wrapper">
-          <span class="material-symbols-outlined input-icon">person</span>
-          <input v-model="form.fullName" class="form-input" placeholder="Full Name" type="text" />
-        </div>
-        <div class="input-wrapper">
           <span class="material-symbols-outlined input-icon">mail</span>
-          <input v-model="form.registerNumber" class="form-input" placeholder="Register Number" type="text" />
-        </div>
-        <div class="input-wrapper">
-          <span class="material-symbols-outlined input-icon">supervisor_account</span>
-          <input v-model="form.parentEmail" class="form-input" placeholder="Parent's Email" type="email" />
+          <input
+            v-model="form.registerNumber"
+            class="form-input"
+            placeholder="Register Number"
+            type="text"
+          />
         </div>
         <div class="input-wrapper">
           <span class="material-symbols-outlined input-icon">lock</span>
-          <input v-model="form.password" class="form-input" placeholder="Password" type="password" />
+          <input
+            v-model="form.password"
+            class="form-input"
+            placeholder="Password"
+            type="password"
+          />
         </div>
       </div>
 
-      <button class="signup-button" @click="signUp">
-        Sign Up
+      <button class="signup-button" @click="signIn">
+        Sign In
       </button>
 
       <div class="login-link-container">
         <p class="login-link-text">
-          Already have an account?
-          <a class="login-link" @click="$router.push('/signin')">Log in</a>
+          Don't have an account?
+          <a class="login-link" @click="$router.push('/signup')">Sign Up</a>
         </p>
       </div>
     </main>
@@ -48,17 +50,45 @@ import { useRouter } from "vue-router";
 const router = useRouter();
 
 const form = reactive({
-  fullName: "",
   registerNumber: "",
-  parentEmail: "",
   password: ""
 });
 
-const signUp = () => {
-  localStorage.setItem("signupData", JSON.stringify(form));  
-  router.push("/camera");
+const signIn = async () => {
+  try {
+    const res = await fetch(
+      `https://32d3b93219fe.ngrok-free.app/user/login?reg_no=${encodeURIComponent(
+        form.registerNumber
+      )}&password=${encodeURIComponent(form.password)}`,
+      {
+        method: "GET",
+        headers: {
+          "ngrok-skip-browser-warning": "true"
+        }
+      }
+    );
+
+    if (!res.ok) {
+      throw new Error(`HTTP error ${res.status}`);
+    }
+
+    const data = await res.json();
+    console.log("Login response:", data);
+
+    // Expecting [true, "User logged in successfully."] on success
+    if (Array.isArray(data) && data[0] === true) {
+      router.push("/"); // ✅ success → go home
+    } else {
+      alert("Invalid credentials"); // ❌ failed login
+    }
+  } catch (err) {
+    console.error("Error logging in:", err);
+    alert("Something went wrong. Please try again.");
+  }
 };
 </script>
+
+
 
 
 <style scoped>
