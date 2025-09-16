@@ -182,47 +182,6 @@
   }
 }
 
-.footer {
-  position: fixed;
-  bottom: 0;
-  width: 100%;
-  background-color: white;
-  border-top: 1px solid #e5e7eb;
-  z-index: 10;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
-}
-
-.navigation {
-  display: flex;
-  justify-content: space-around;
-  padding: 12px 0;
-}
-
-.nav-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-  width: 25%;
-  text-decoration: none;
-  color: #6b7280;
-}
-
-.nav-label {
-  font-size: 12px;
-  font-weight: 500;
-  margin: 0;
-}
-
-.nav-item--active .nav-label {
-  font-weight: 700;
-}
-
-.nav-item--active {
-  color: #4f46e5;
-}
-
 body {
   margin: 0;
   padding: 0;
@@ -491,33 +450,17 @@ body {
           </div>
         </main>
       </div>
-
-      <footer class="footer">
-        <nav class="navigation">
-          <a v-for="navItem in navigationItems" :key="navItem.name"
-            :class="['nav-item', navItem.active ? 'nav-item--active' : '']" href="#"
-            @click.prevent="navigateTo(navItem.name)">
-            <span :class="['material-symbols-outlined', !navItem.active && 'nav-icon--outlined']">{{navItem.icon }}</span>
-            <p class="nav-label">{{ navItem.name }}</p>
-          </a>
-        </nav>
-      </footer>
+      <NavComp/>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import NavComp from '../components/nav.vue' 
 
 const userName = ref('Jezwin')
 const hasNotifications = ref(true)
-
-const navigationItems = ref([
-  { name: 'Home', icon: 'home', active: true },
-  { name: 'OD/ML', icon: 'calendar_month', active: false },
-  { name: 'Stats', icon: 'bar_chart', active: false },
-  { name: 'Profile', icon: 'person', active: false }
-])
 
 const selectedDate = ref(15)
 
@@ -530,7 +473,20 @@ const dates = ref([
   { day: 'Sat', num: 20 },
 ])
 
-// Dummy schedule data for each day
+function getUserDetails() {
+        const storedData = localStorage.getItem("signupData");
+        if (!storedData) {
+            console.error("No signup data found in localStorage");
+            return;
+        }
+        const formData = JSON.parse(storedData);
+        userName.value = formData.fullName.split(" ")[0]
+}
+
+onMounted(() => {
+  getUserDetails()
+})
+
 const scheduleData = ref({
   14: [ // Monday
     { time: '10:00 AM', subject: 'Calculus', duration: '10:00 - 11:30 AM', type: 'physics' },
@@ -557,17 +513,13 @@ const scheduleData = ref({
   19: [], // Saturday has no classes
 })
 
-// 2. COMPUTED PROPERTY
-// This automatically returns the correct schedule when `selectedDate` changes
 const currentSchedule = computed(() => {
   return scheduleData.value[selectedDate.value] || []
 })
 
-// 3. SLIDING ANIMATION LOGIC
 const dateElements = ref([]) // Holds the DOM elements for the dates
 const activeIndicatorStyle = ref({}) // Holds the CSS for the sliding indicator
 
-// Function to update the indicator's position and width
 const updateIndicator = () => {
   const activeIndex = dates.value.findIndex(d => d.num === selectedDate.value)
   const activeEl = dateElements.value[activeIndex]
@@ -580,25 +532,20 @@ const updateIndicator = () => {
   }
 }
 
-// Function to handle clicking a date
 const selectDate = (dateNum) => {
   selectedDate.value = dateNum
 }
 
-// Watch for changes to selectedDate and update the indicator
 watch(selectedDate, async () => {
-  // nextTick ensures the DOM has updated before we measure the element
   await nextTick()
   updateIndicator()
 });
 
-// Set the initial position of the indicator when the component mounts
 onMounted(async () => {
   await nextTick()
   updateIndicator()
 })
 
-// --- END OF NEW LOGIC ---
 
 const handleNotifications = () => {
   console.log('Notifications clicked')
@@ -606,12 +553,5 @@ const handleNotifications = () => {
 
 const scanQRCode = () => {
   console.log('QR Code scan initiated')
-}
-
-const navigateTo = (section) => {
-  navigationItems.value.forEach(item => {
-    item.active = item.name === section
-  })
-  console.log(`Mapsd to ${section}`)
 }
 </script>
