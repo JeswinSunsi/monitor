@@ -51,7 +51,8 @@ const form = reactive({
   fullName: "",
   registerNumber: "",
   parentEmail: "",
-  password: ""
+  password: "",
+  role: ""
 });
 
 const signUp = () => {
