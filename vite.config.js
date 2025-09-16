@@ -9,7 +9,7 @@ export default defineConfig({
     vue(),
   ],
     server: {
-    allowedHosts: ["5d1ca5ca6871.ngrok-free.app"],
+    allowedHosts: ["7f58a9f37128.ngrok-free.app"],
     host: true, 
   },
   resolve: {
