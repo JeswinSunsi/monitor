@@ -50,16 +50,15 @@ import { useRouter } from "vue-router";
 const router = useRouter();
 
 const form = reactive({
+  fullName: "",
   registerNumber: "",
+  parentEmail: "",
   password: ""
 });
 
 const signIn = async () => {
   try {
-    const res = await fetch(
-      `https://32d3b93219fe.ngrok-free.app/user/login?reg_no=${encodeURIComponent(
-        form.registerNumber
-      )}&password=${encodeURIComponent(form.password)}`,
+    const res = await fetch(`https://5af483c564df.ngrok-free.app/user/login?reg_no=${encodeURIComponent(form.registerNumber)}&password=${encodeURIComponent(form.password)}`,
       {
         method: "GET",
         headers: {
@@ -75,11 +74,26 @@ const signIn = async () => {
     const data = await res.json();
     console.log("Login response:", data);
 
-    // Expecting [true, "User logged in successfully."] on success
+    // Example response:
+    // [ true, { reg_no: "RA2311033010181", name: "Jezwin Sunsi", role: "student", parent_email: "jezwinsunsi@gmail.com" } ]
+
     if (Array.isArray(data) && data[0] === true) {
-      router.push("/"); // ✅ success → go home
+      // ✅ Map login response into the form structure
+      form.fullName = data[1].name || "";
+      form.registerNumber = data[1].reg_no || "";
+      form.parentEmail = data[1].parent_email || "";
+      form.role = data[1].role || "";
+      form.password = ""; // don’t store password from server for safety
+      // ✅ Save to localStorage in signup format
+      localStorage.setItem("signupData", JSON.stringify(form));
+      if (data[1].role == 'student') {
+      router.push("/");
+      }
+      else {
+        router.push('/faculty')
+      }
     } else {
-      alert("Invalid credentials"); // ❌ failed login
+      alert("Invalid credentials");
     }
   } catch (err) {
     console.error("Error logging in:", err);
@@ -87,8 +101,6 @@ const signIn = async () => {
   }
 };
 </script>
-
-
 
 
 <style scoped>
