@@ -405,7 +405,7 @@ body {
               </div>
               <h2 class="qr-title">Check In for Your Next Class</h2>
               <p class="qr-description">Scan your face inside the classroom to mark your attendance.</p>
-              <button @click="scanQRCode" class="qr-scan-btn">
+              <button @click="$router.push('/attendance')" class="qr-scan-btn">
                 <span class="material-symbols-outlined">ar_on_you</span>
                 <span>Mark Attendance</span>
               </button>
@@ -450,14 +450,14 @@ body {
           </div>
         </main>
       </div>
-      <NavComp/>
+      <NavComp />
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
-import NavComp from '../components/nav.vue' 
+import NavComp from '../components/nav.vue'
 
 const userName = ref('Jezwin')
 const hasNotifications = ref(true)
@@ -474,13 +474,13 @@ const dates = ref([
 ])
 
 function getUserDetails() {
-        const storedData = localStorage.getItem("signupData");
-        if (!storedData) {
-            console.error("No signup data found in localStorage");
-            return;
-        }
-        const formData = JSON.parse(storedData);
-        userName.value = formData.fullName.split(" ")[0]
+  const storedData = localStorage.getItem("signupData");
+  if (!storedData) {
+    console.error("No signup data found in localStorage");
+    return;
+  }
+  const formData = JSON.parse(storedData);
+  userName.value = formData.fullName.split(" ")[0]
 }
 
 onMounted(() => {
